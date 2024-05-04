@@ -9,15 +9,16 @@ from django.core.mail import send_mail
 from django.utils.crypto import get_random_string
 from django.utils import timezone
 import datetime
-from rest_framework.decorators import action
 
 
+# Provides CRUD operations for Category model with authentication
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     permission_classes = [IsAuthenticated]
 
 
+# Handles password reset requests by setting a new password
 class ResetPasswordView(views.APIView):
     def post(self, request, *args, **kwargs):
         email = request.data.get("email")
@@ -33,6 +34,7 @@ class ResetPasswordView(views.APIView):
         return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
 
+# Validates password reset codes and checks for expiration
 class VerifyResetCodeView(views.APIView):
     def post(self, request, *args, **kwargs):
         email = request.data.get("email")
@@ -43,8 +45,7 @@ class VerifyResetCodeView(views.APIView):
                 user=user, reset_code=code
             ).first()
             if password_reset_code and not password_reset_code.is_expired():
-                # Optionally, invalidate the code immediately after use
-                password_reset_code.delete()
+                password_reset_code.delete()  # Invalidate the code after use
                 return Response({"message": "Code verified"}, status=status.HTTP_200_OK)
             return Response(
                 {"error": "Invalid or expired code"}, status=status.HTTP_400_BAD_REQUEST
@@ -52,23 +53,21 @@ class VerifyResetCodeView(views.APIView):
         return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
 
+# Sends password reset codes to users' email
 class PasswordResetRequestView(views.APIView):
     def post(self, request, *args, **kwargs):
         email = request.data.get("email")
         user = User.objects.filter(email=email).first()
         if user:
-            # Generate a 6-digit code
-            reset_code = get_random_string(length=6, allowed_chars="0123456789")
+            reset_code = get_random_string(
+                length=6, allowed_chars="0123456789"
+            )  # Generate a 6-digit code
             expiration_time = timezone.now() + datetime.timedelta(
                 minutes=10
-            )  # 10 minutes from now
-
-            # Save the code and expiration time
+            )  # Code expires in 10 minutes
             PasswordResetCode.objects.create(
                 user=user, reset_code=reset_code, expires_at=expiration_time
             )
-
-            # Send email with the code
             send_mail(
                 "Password Reset Code",
                 f"Your password reset code is: {reset_code}",
@@ -80,15 +79,17 @@ class PasswordResetRequestView(views.APIView):
         return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
 
+# Allows users to delete their account
 class UserDeleteAPIView(generics.DestroyAPIView):
     queryset = User.objects.all()
     serializer_class = UserRegistrationSerializer
     permission_classes = [IsAuthenticated]
 
     def get_object(self):
-        return self.request.user
+        return self.request.user  # Only allows deleting the logged-in user
 
 
+# Handles user registration using custom serialization
 class UserRegistrationAPIView(generics.CreateAPIView):
     serializer_class = UserRegistrationSerializer
 
@@ -96,14 +97,13 @@ class UserRegistrationAPIView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-            if user:
-                return Response(
-                    {"message": "User created successfully"},
-                    status=status.HTTP_201_CREATED,
-                )
+            return Response(
+                {"message": "User created successfully"}, status=status.HTTP_201_CREATED
+            )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+# Manages item data with filtering, searching, and ordering capabilities
 class ItemViewSet(viewsets.ModelViewSet):
     queryset = Item.objects.all()
     serializer_class = ItemSerializer
@@ -116,13 +116,6 @@ class ItemViewSet(viewsets.ModelViewSet):
         "in_stock",
         "is_salable",
         "price",
-    ]  # Added price here
-    ordering_fields = ["name", "in_stock", "price"]  # Added price here
+    ]
+    ordering_fields = ["name", "in_stock", "price"]
     search_fields = ["name", "description", "tags"]
-
-
-# Category ViewSet
-class CategoryViewSet(viewsets.ModelViewSet):
-    queryset = Category.objects.all()
-    serializer_class = CategorySerializer
-    permission_classes = [IsAuthenticated]

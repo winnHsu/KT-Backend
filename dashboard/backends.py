@@ -4,23 +4,24 @@ import ssl
 
 class NoTLSVerifyEmailBackend(EmailBackend):
     def open(self):
+        # Return immediately if a connection is already open
         if self.connection is not None:
-            # If connection is already open, do nothing
             return False
 
         try:
-            # Establish connection without verifying SSL certificates
+            # Initialize SMTP connection without SSL certificate verification
             self.connection = self.connection_class(
                 host=self.host,
                 port=self.port,
-                context=ssl._create_unverified_context(),  # Context to avoid certificate verification
+                context=ssl._create_unverified_context(),
             )
 
-            # Log in to the server if username and password are provided
+            # Perform server login if credentials are available
             if self.username and self.password:
                 self.connection.login(self.username, self.password)
             return True
-        except Exception as e:
+        except Exception:
+            # Reraise the exception if fail_silently is False
             if not self.fail_silently:
                 raise
             return False
